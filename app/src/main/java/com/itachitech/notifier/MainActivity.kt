@@ -20,7 +20,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Help
+import androidx.compose.material.icons.automirrored.filled.Help
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.NetworkCheck
 import androidx.compose.material3.Button
@@ -232,7 +232,7 @@ enum class AppDestinations(
 ) {
     HOME("Home", Icons.Default.Home),
     STATUS("Status", Icons.Default.NetworkCheck),
-    HELP("Help", Icons.Default.Help)
+    HELP("Help", Icons.AutoMirrored.Filled.Help)
 }
 
 @Composable
@@ -304,10 +304,10 @@ fun HelpScreen(modifier: Modifier = Modifier) {
         TroubleshootingStep(
             stepNumber = 1,
             title = "Autostart Settings",
-            description = when {
-                brand == "vivo" || brand == "iqoo" -> "Look for an 'Autostart' or 'Bgstartup' setting and enable it for Notifier."
-                brand == "xiaomi" -> "Find Notifier in the list and enable Autostart."
-                brand == "samsung" -> "Samsung devices usually don\'t have a specific Autostart setting. Please check the Battery Settings instead."
+            description = when (brand) {
+                "vivo", "iqoo" -> "Look for an 'Autostart' or 'Bgstartup' setting and enable it for Notifier."
+                "xiaomi" -> "Find Notifier in the list and enable Autostart."
+                "samsung" -> "Samsung devices usually don\'t have a specific Autostart setting. Please check the Battery Settings instead."
                 else -> "Find a setting for apps that start automatically and ensure Notifier is enabled."
             },
             buttonText = "Open Autostart Settings",
@@ -317,10 +317,10 @@ fun HelpScreen(modifier: Modifier = Modifier) {
         TroubleshootingStep(
             stepNumber = 2,
             title = "Battery Settings",
-            description = when {
-                brand == "vivo" || brand == "iqoo" -> "Look for 'High background power consumption' and enable it for Notifier."
-                brand == "xiaomi" -> "Find Notifier and set the Battery saver to 'No restrictions'."
-                brand == "samsung" -> "Go to 'Background usage limits' and ensure Notifier is not in the 'Sleeping apps' or 'Deep sleeping apps' list."
+            description = when (brand) {
+                "vivo", "iqoo" -> "Look for 'High background power consumption' and enable it for Notifier."
+                "xiaomi" -> "Find Notifier and set the Battery saver to 'No restrictions'."
+                "samsung" -> "Go to 'Background usage limits' and ensure Notifier is not in the 'Sleeping apps' or 'Deep sleeping apps' list."
                 else -> "Find your phone\'s battery optimization settings and exempt Notifier from optimization."
             },
             buttonText = "Open Battery Settings",
