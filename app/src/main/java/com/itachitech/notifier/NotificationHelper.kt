@@ -9,7 +9,6 @@ import android.content.Intent
 import android.os.Build
 import androidx.annotation.DrawableRes
 import androidx.core.app.NotificationCompat
-import androidx.core.app.NotificationManagerCompat
 
 class NotificationHelper(private val context: Context) {
 

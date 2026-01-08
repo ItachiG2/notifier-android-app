@@ -102,7 +102,6 @@ object SettingsHelper {
                 openStandardAppSettings(context)
             }
         } else {
-            // On older versions, this permission is granted by default.
             openStandardAppSettings(context)
         }
     }
@@ -122,14 +121,19 @@ object SettingsHelper {
         }
         return false
     }
-    
+
     private fun openPowerManagementFallback(context: Context) {
         Toast.makeText(context, "Could not find specific setting. Opening general battery settings.", Toast.LENGTH_SHORT).show()
-        try {
-            val intent = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            context.startActivity(intent)
-        } catch (e: Exception) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            try {
+                val intent = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                context.startActivity(intent)
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to open battery optimization fallback", e)
+                openStandardAppSettings(context)
+            }
+        } else {
             openStandardAppSettings(context)
         }
     }
