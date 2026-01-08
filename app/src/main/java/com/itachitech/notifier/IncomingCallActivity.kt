@@ -1,5 +1,6 @@
 package com.itachitech.notifier
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -16,11 +17,20 @@ import com.itachitech.notifier.ui.theme.NotifierTheme
 class IncomingCallActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val message = intent.getStringExtra("message") ?: "Incoming call"
+        val message = intent.getStringExtra("message") ?: "Incoming notification"
 
         setContent {
             NotifierTheme {
-                IncomingCallScreen(message = message, onDismiss = { finish() })
+                IncomingCallScreen(message = message, onDismiss = {
+                    // Send an intent to the service to dismiss the notification
+                    val dismissIntent = Intent(this, NotifierService::class.java).apply {
+                        action = "ACTION_DISMISS_CALL"
+                    }
+                    startService(dismissIntent)
+
+                    // Finish the activity
+                    finish()
+                })
             }
         }
     }
@@ -37,14 +47,8 @@ fun IncomingCallScreen(message: String, onDismiss: () -> Unit) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(text = message, style = MaterialTheme.typography.headlineMedium)
             Spacer(modifier = Modifier.height(32.dp))
-            Row {
-                Button(onClick = { /* TODO: Implement answer functionality */ }) {
-                    Text(text = "Answer")
-                }
-                Spacer(modifier = Modifier.width(16.dp))
-                Button(onClick = onDismiss) {
-                    Text(text = "Dismiss")
-                }
+            Button(onClick = onDismiss) {
+                Text(text = "Dismiss")
             }
         }
     }

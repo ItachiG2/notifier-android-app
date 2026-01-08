@@ -9,19 +9,7 @@ import android.os.Build
 import android.util.Log
 import androidx.core.content.ContextCompat
 import com.google.android.gms.nearby.Nearby
-import com.google.android.gms.nearby.connection.AdvertisingOptions
-import com.google.android.gms.nearby.connection.ConnectionInfo
-import com.google.android.gms.nearby.connection.ConnectionLifecycleCallback
-import com.google.android.gms.nearby.connection.ConnectionResolution
-import com.google.android.gms.nearby.connection.ConnectionsClient
-import com.google.android.gms.nearby.connection.ConnectionsStatusCodes
-import com.google.android.gms.nearby.connection.DiscoveredEndpointInfo
-import com.google.android.gms.nearby.connection.DiscoveryOptions
-import com.google.android.gms.nearby.connection.EndpointDiscoveryCallback
-import com.google.android.gms.nearby.connection.Payload
-import com.google.android.gms.nearby.connection.PayloadCallback
-import com.google.android.gms.nearby.connection.PayloadTransferUpdate
-import com.google.android.gms.nearby.connection.Strategy
+import com.google.android.gms.nearby.connection.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
@@ -53,17 +41,19 @@ class NearbyConnectionsManager private constructor(private val context: Context)
     private val connectionLifecycleCallback = object : ConnectionLifecycleCallback() {
         override fun onConnectionInitiated(endpointId: String, connectionInfo: ConnectionInfo) {
             Log.d(TAG, "onConnectionInitiated: accepting connection from ${connectionInfo.endpointName} (id: $endpointId)")
-            discoveredEndpoints[endpointId] = connectionInfo.endpointName
+            // Safe replacement for putIfAbsent
+            if (!discoveredEndpoints.containsKey(endpointId)) {
+                discoveredEndpoints[endpointId] = connectionInfo.endpointName
+            }
             connectionsClient.acceptConnection(endpointId, payloadCallback)
         }
 
         override fun onConnectionResult(endpointId: String, result: ConnectionResolution) {
-            val endpointName = discoveredEndpoints.remove(endpointId) ?: "Unknown Device"
+            val endpointName = discoveredEndpoints[endpointId] ?: "Unknown Device"
+
             when (result.status.statusCode) {
                 ConnectionsStatusCodes.STATUS_OK, ConnectionsStatusCodes.STATUS_ALREADY_CONNECTED_TO_ENDPOINT -> {
                     Log.d(TAG, "onConnectionResult: success or already connected for $endpointName (id: $endpointId)")
-                    connectionsClient.stopAdvertising()
-                    connectionsClient.stopDiscovery()
                     if (!connectedEndpoints.containsKey(endpointId)) {
                         connectedEndpoints[endpointId] = endpointName
                         updateConnectedDevices()
@@ -71,6 +61,7 @@ class NearbyConnectionsManager private constructor(private val context: Context)
                 }
                 else -> {
                     Log.e(TAG, "onConnectionResult: failure for $endpointName (id: $endpointId), status code: ${result.status.statusCode}")
+                    discoveredEndpoints.remove(endpointId)
                     if (connectedEndpoints.isEmpty()) {
                         startAdvertising()
                         startDiscovery()
@@ -83,13 +74,20 @@ class NearbyConnectionsManager private constructor(private val context: Context)
             val removedDevice = connectedEndpoints.remove(endpointId)
             Log.d(TAG, "onDisconnected: from ${removedDevice ?: endpointId}")
             updateConnectedDevices()
-            startAdvertising()
-            startDiscovery()
+            if (connectedEndpoints.isEmpty()) {
+                startAdvertising()
+                startDiscovery()
+            }
         }
     }
 
     private val endpointDiscoveryCallback = object : EndpointDiscoveryCallback() {
         override fun onEndpointFound(endpointId: String, discoveredEndpointInfo: DiscoveredEndpointInfo) {
+            if (connectedEndpoints.containsKey(endpointId)) {
+                Log.d(TAG, "onEndpointFound: already connected to ${discoveredEndpointInfo.endpointName}, ignoring.")
+                return
+            }
+
             Log.d(TAG, "onEndpointFound: endpoint ${discoveredEndpointInfo.endpointName} (id: $endpointId) found, requesting connection")
             discoveredEndpoints[endpointId] = discoveredEndpointInfo.endpointName
             connectionsClient.requestConnection(localEndpointName, endpointId, connectionLifecycleCallback)
@@ -128,7 +126,10 @@ class NearbyConnectionsManager private constructor(private val context: Context)
     fun startAdvertising() {
         localEndpointName = getBluetoothName()
         connectionsClient.stopAdvertising() // Defensive stop
-        val advertisingOptions = AdvertisingOptions.Builder().setStrategy(Strategy.P2P_STAR).build()
+        val advertisingOptions = AdvertisingOptions.Builder()
+            .setStrategy(Strategy.P2P_CLUSTER)
+            .setLowPower(true)
+            .build()
         connectionsClient.startAdvertising(
             localEndpointName, SERVICE_ID, connectionLifecycleCallback, advertisingOptions
         ).addOnSuccessListener { Log.d(TAG, "startAdvertising: success with name $localEndpointName") }
@@ -137,7 +138,10 @@ class NearbyConnectionsManager private constructor(private val context: Context)
 
     fun startDiscovery() {
         connectionsClient.stopDiscovery() // Defensive stop
-        val discoveryOptions = DiscoveryOptions.Builder().setStrategy(Strategy.P2P_STAR).build()
+        val discoveryOptions = DiscoveryOptions.Builder()
+            .setStrategy(Strategy.P2P_CLUSTER)
+            .setLowPower(true)
+            .build()
         connectionsClient.startDiscovery(
             SERVICE_ID, endpointDiscoveryCallback, discoveryOptions
         ).addOnSuccessListener { Log.d(TAG, "startDiscovery: success") }
@@ -165,7 +169,6 @@ class NearbyConnectionsManager private constructor(private val context: Context)
 
         fun getInstance(context: Context): NearbyConnectionsManager {
             return INSTANCE ?: synchronized(this) {
-                // Always use application context to prevent leaks
                 INSTANCE ?: NearbyConnectionsManager(context.applicationContext).also { INSTANCE = it }
             }
         }

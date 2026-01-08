@@ -2,10 +2,12 @@ package com.itachitech.notifier
 
 import android.annotation.SuppressLint
 import android.app.Service
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Binder
 import android.os.IBinder
+import android.os.PowerManager
 import android.provider.ContactsContract
 import android.util.Log
 import com.google.android.gms.nearby.connection.Payload
@@ -34,6 +36,7 @@ class NotifierService : Service(), NearbyConnectionsManager.PayloadListener {
     private lateinit var notificationHelper: NotificationHelper
     private val serviceJob = SupervisorJob()
     private val serviceScope = CoroutineScope(Dispatchers.Main + serviceJob)
+    private var wakeLock: PowerManager.WakeLock? = null
 
     private val _notificationMessage = MutableStateFlow<String?>(null)
     /**
@@ -48,12 +51,18 @@ class NotifierService : Service(), NearbyConnectionsManager.PayloadListener {
         nearbyConnectionsManager.connectedDeviceNames
     }
 
+    @SuppressLint("WakelockTimeout")
     override fun onCreate() {
         super.onCreate()
         nearbyConnectionsManager = NearbyConnectionsManager.getInstance(this)
         nearbyConnectionsManager.setPayloadListener(this)
         notificationHelper = NotificationHelper(this)
         notificationHelper.createServiceChannel()
+
+        // Acquire a wake lock to keep the network hardware active
+        val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
+        wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "Notifier::NetworkWakeLock")
+        wakeLock?.acquire()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -62,7 +71,7 @@ class NotifierService : Service(), NearbyConnectionsManager.PayloadListener {
             return START_STICKY
         }
 
-        startForeground(NotificationHelper.SERVICE_NOTIFICATION_ID, notificationHelper.getServiceNotification("Searching for devices..."))
+        startForeground(NotificationHelper.SERVICE_NOTIFICATION_ID, notificationHelper.getServiceNotification("Searching for devices...", R.drawable.baseline_sync_disabled_24))
 
         observeConnectionStatus()
 
@@ -79,12 +88,15 @@ class NotifierService : Service(), NearbyConnectionsManager.PayloadListener {
     private fun observeConnectionStatus() {
         serviceScope.launch {
             connectedDeviceNames.collect { names ->
-                val contentText = if (names.isNotEmpty()) {
+                val isConnected = names.isNotEmpty()
+                val contentText = if (isConnected) {
                     "Connected to: ${names.joinToString()}"
                 } else {
                     "Not connected. Searching for devices..."
                 }
-                startForeground(NotificationHelper.SERVICE_NOTIFICATION_ID, notificationHelper.getServiceNotification(contentText))
+                val iconResId = if (isConnected) R.drawable.baseline_sync_24 else R.drawable.baseline_sync_disabled_24
+
+                startForeground(NotificationHelper.SERVICE_NOTIFICATION_ID, notificationHelper.getServiceNotification(contentText, iconResId))
             }
         }
     }
@@ -92,6 +104,7 @@ class NotifierService : Service(), NearbyConnectionsManager.PayloadListener {
     override fun onDestroy() {
         super.onDestroy()
         serviceJob.cancel()
+        wakeLock?.release()
     }
 
     override fun onBind(intent: Intent?): IBinder = binder
@@ -130,32 +143,34 @@ class NotifierService : Service(), NearbyConnectionsManager.PayloadListener {
             }
 
             val content = parts.getOrElse(1) { "" }
-
+            var notificationTitle = ""
             val finalMessage = when (type) {
                 "call" -> {
+                    notificationTitle = "Incoming Call"
                     val contactName = getContactDisplayName(content)
                     if (contactName != null) {
-                        "Incoming call from: $contactName ($content)"
+                        "$contactName ($content)"
                     } else {
-                        "Incoming call from: $content"
+                        content
                     }
                 }
                 "sms" -> {
+                    notificationTitle = "New Message"
                     val smsParts = content.split(":", limit = 2)
                     val sender = smsParts.getOrNull(0) ?: "Unknown"
                     val body = smsParts.getOrNull(1) ?: ""
                     val contactName = getContactDisplayName(sender)
                     if (contactName != null) {
-                        "SMS from: $contactName ($sender)\n$body"
+                        "From: $contactName ($sender)\n$body"
                     } else {
-                        "SMS from: $sender\n$body"
+                        "From: $sender\n$body"
                     }
                 }
                 else -> rawMessage
             }
 
-            _notificationMessage.value = finalMessage
-            notificationHelper.showIncomingCallNotification(finalMessage)
+            _notificationMessage.value = "$notificationTitle\n$finalMessage"
+            notificationHelper.showIncomingCallNotification(notificationTitle, finalMessage)
         }
     }
 

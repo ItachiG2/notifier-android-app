@@ -7,22 +7,23 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import androidx.annotation.DrawableRes
 import androidx.core.app.NotificationCompat
 
 class NotificationHelper(private val context: Context) {
 
     private val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
-    fun getServiceNotification(contentText: String): Notification {
+    fun getServiceNotification(contentText: String, @DrawableRes iconResId: Int): Notification {
         return NotificationCompat.Builder(context, SERVICE_CHANNEL_ID)
             .setContentTitle("Notifier Service")
             .setContentText(contentText)
-            .setSmallIcon(R.mipmap.ic_launcher)
+            .setSmallIcon(iconResId)
             .setOngoing(true)
             .build()
     }
 
-    fun showIncomingCallNotification(message: String) {
+    fun showIncomingCallNotification(title: String, message: String) {
         createIncomingCallChannel()
 
         val fullScreenIntent = Intent(context, IncomingCallActivity::class.java).apply {
@@ -43,8 +44,8 @@ class NotificationHelper(private val context: Context) {
         )
 
         val notificationBuilder = NotificationCompat.Builder(context, INCOMING_CALL_CHANNEL_ID)
-            .setSmallIcon(R.mipmap.ic_launcher)
-            .setContentTitle("Incoming Call")
+            .setSmallIcon(R.drawable.baseline_sync_24)
+            .setContentTitle(title)
             .setContentText(message)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_CALL)
@@ -58,7 +59,7 @@ class NotificationHelper(private val context: Context) {
         createMissedCallChannel()
 
         val notificationBuilder = NotificationCompat.Builder(context, MISSED_CALL_CHANNEL_ID)
-            .setSmallIcon(R.mipmap.ic_launcher)
+            .setSmallIcon(R.drawable.baseline_sync_24)
             .setContentTitle("Missed Call")
             .setContentText(message)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
