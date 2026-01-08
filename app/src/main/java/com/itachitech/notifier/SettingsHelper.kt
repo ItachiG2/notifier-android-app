@@ -23,14 +23,14 @@ object SettingsHelper {
         Intent().setComponent(ComponentName("com.vivo.permissionmanager", "com.vivo.permissionmanager.activity.BgstartupswitchActivity")),
         Intent().setComponent(ComponentName("com.iqoo.secure", "com.iqoo.secure.ui.phoneoptimize.BgStartUpManager")),
         Intent().setComponent(ComponentName("com.iqoo.secure", "com.iqoo.secure.ui.phoneoptimize.AddWhiteListActivity")),
-        Intent().setComponent(ComponentName("com.vivo.permissionmanager", "com.vivo.permissionmanager.activity.PurviewTabActivity"))
+        Intent().setComponent(ComponentName("com.vivo.permissionmanager", "com.vivo.permissionmanager.activity.PurviewTabActivity")),
     )
 
     private val XIAOMI_AUTOSART_INTENTS = listOf(
         Intent().setComponent(ComponentName("com.miui.securitycenter", "com.miui.permcenter.autostart.AutoStartManagementActivity")),
         Intent().setComponent(ComponentName("com.miui.securitycenter", "com.miui.permcenter.autostart.BgAutostartManagementActivity")),
         Intent("miui.intent.action.APP_PERM_EDITOR").setComponent(ComponentName("com.miui.securitycenter", "com.miui.permcenter.permissions.PermissionsEditorActivity")),
-        Intent().setComponent(ComponentName("com.miui.securitycenter", "com.miui.securityscan.MainActivity"))
+        Intent().setComponent(ComponentName("com.miui.securitycenter", "com.miui.securityscan.MainActivity")),
     )
 
     private val OPPO_REALME_ONEPLUS_AUTOSART_INTENTS = listOf(
@@ -38,7 +38,7 @@ object SettingsHelper {
         Intent().setComponent(ComponentName("com.realme.security", "com.realme.security.startup.StartupAppListActivity")),
         Intent().setComponent(ComponentName("com.oneplus.security", "com.oneplus.security.chainlaunch.ChainLaunchAppListActivity")),
         Intent().setComponent(ComponentName("com.coloros.safecenter", "com.coloros.safecenter.permission.startup.StartupAppListActivity")),
-        Intent().setComponent(ComponentName("com.coloros.oppoguardelf", "com.coloros.powermanager.fuelgaue.PowerUsageModelActivity"))
+        Intent().setComponent(ComponentName("com.coloros.oppoguardelf", "com.coloros.powermanager.fuelgaue.PowerUsageModelActivity")),
     )
 
     private val SAMSUNG_AUTOSART_INTENTS = listOf(
@@ -89,6 +89,24 @@ object SettingsHelper {
         }
     }
 
+    fun openFullScreenIntentSettings(context: Context) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            val intent = Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT).apply {
+                data = Uri.fromParts("package", context.packageName, null)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            try {
+                context.startActivity(intent)
+            } catch (e: ActivityNotFoundException) {
+                Log.e(TAG, "Device does not support ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT", e)
+                openStandardAppSettings(context)
+            }
+        } else {
+            // On older versions, this permission is granted by default.
+            openStandardAppSettings(context)
+        }
+    }
+
     private fun tryIntents(context: Context, intents: List<Intent>): Boolean {
         for (intent in intents) {
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -104,7 +122,7 @@ object SettingsHelper {
         }
         return false
     }
-
+    
     private fun openPowerManagementFallback(context: Context) {
         Toast.makeText(context, "Could not find specific setting. Opening general battery settings.", Toast.LENGTH_SHORT).show()
         try {

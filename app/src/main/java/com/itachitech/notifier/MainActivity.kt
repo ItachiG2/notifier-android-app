@@ -31,9 +31,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
 import androidx.compose.runtime.*
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -307,9 +305,9 @@ fun HelpScreen(modifier: Modifier = Modifier) {
             stepNumber = 1,
             title = "Autostart Settings",
             description = when {
-                brand == "vivo" || brand == "iqoo" -> "Find Notifier in the list and enable Allow background usage."
-                brand == "xiaomi" -> "Find Notifier in the list and enable Background autostart."
-                brand == "samsung" -> "Samsung devices usually don't have a specific Autostart setting. Please check the Battery Settings instead."
+                brand == "vivo" || brand == "iqoo" -> "Look for an 'Autostart' or 'Bgstartup' setting and enable it for Notifier."
+                brand == "xiaomi" -> "Find Notifier in the list and enable Autostart."
+                brand == "samsung" -> "Samsung devices usually don\'t have a specific Autostart setting. Please check the Battery Settings instead."
                 else -> "Find a setting for apps that start automatically and ensure Notifier is enabled."
             },
             buttonText = "Open Autostart Settings",
@@ -323,14 +321,24 @@ fun HelpScreen(modifier: Modifier = Modifier) {
                 brand == "vivo" || brand == "iqoo" -> "Look for 'High background power consumption' and enable it for Notifier."
                 brand == "xiaomi" -> "Find Notifier and set the Battery saver to 'No restrictions'."
                 brand == "samsung" -> "Go to 'Background usage limits' and ensure Notifier is not in the 'Sleeping apps' or 'Deep sleeping apps' list."
-                else -> "Find your phone's battery optimization settings and exempt Notifier from optimization."
+                else -> "Find your phone\'s battery optimization settings and exempt Notifier from optimization."
             },
             buttonText = "Open Battery Settings",
             onClick = { SettingsHelper.openBatterySettings(context) }
         )
 
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            TroubleshootingStep(
+                stepNumber = 3,
+                title = "Full-Screen Notification Permission",
+                description = "On Android 14 and newer, Notifier needs special permission to show full-screen notifications for incoming calls.",
+                buttonText = "Open Full-Screen Settings",
+                onClick = { SettingsHelper.openFullScreenIntentSettings(context) }
+            )
+        }
+
         Text(
-            text = "Note: If a specific shortcut doesn't work, the app will open the main App Info screen where you can adjust permissions manually.",
+            text = "Note: If a specific shortcut doesn\'t work, the app will try to open the main App Info screen where you can adjust permissions manually.",
             style = MaterialTheme.typography.bodySmall,
             fontStyle = FontStyle.Italic
         )

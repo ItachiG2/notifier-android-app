@@ -9,6 +9,7 @@ import android.content.Intent
 import android.os.Build
 import androidx.annotation.DrawableRes
 import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
 
 class NotificationHelper(private val context: Context) {
 
@@ -49,10 +50,22 @@ class NotificationHelper(private val context: Context) {
             .setContentText(message)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_CALL)
-            .setFullScreenIntent(fullScreenPendingIntent, true)
             .addAction(0, "Dismiss", dismissPendingIntent)
 
+        // Only add the full-screen intent if the permission has been granted.
+        if (canUseFullScreenIntent()) {
+            notificationBuilder.setFullScreenIntent(fullScreenPendingIntent, true)
+        }
+
         notificationManager.notify(INCOMING_CALL_NOTIFICATION_ID, notificationBuilder.build())
+    }
+
+    private fun canUseFullScreenIntent(): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            notificationManager.canUseFullScreenIntent()
+        } else {
+            true // Permission is granted by default on older versions.
+        }
     }
 
     fun showMissedCallNotification(message: String) {
