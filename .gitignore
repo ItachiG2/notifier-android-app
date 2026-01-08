@@ -1,0 +1,27 @@
+gitignore
+# IDE files
+.idea/
+.gradle/
+local.properties
+.DS_Store
+
+# Build files
+build/
+app/build/
+*.apk
+*.aab
+*.ap_
+*.apks
+
+# Keystore files (NEVER commit these)
+*.jks
+*.keystore
+
+# Captures
+captures/
+*.hprof
+
+# Other generated files
+*~
+*.iml
+out/
