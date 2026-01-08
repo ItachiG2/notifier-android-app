@@ -9,6 +9,7 @@ import android.content.Intent
 import android.os.Build
 import androidx.annotation.DrawableRes
 import androidx.core.app.NotificationCompat
+import androidx.core.content.ContextCompat
 
 class NotificationHelper(private val context: Context) {
 
@@ -19,6 +20,7 @@ class NotificationHelper(private val context: Context) {
             .setContentTitle("Notifier Service")
             .setContentText(contentText)
             .setSmallIcon(iconResId)
+            .setColor(ContextCompat.getColor(context, R.color.brand_color_primary))
             .setOngoing(true)
             .build()
     }
