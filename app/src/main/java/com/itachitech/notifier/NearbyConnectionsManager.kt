@@ -3,6 +3,7 @@ package com.itachitech.notifier
 import android.Manifest
 import android.annotation.SuppressLint
 import android.bluetooth.BluetoothManager
+import kotlin.io.path.name
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
@@ -17,6 +18,7 @@ class NearbyConnectionsManager private constructor(private val context: Context)
 
     private val connectionsClient: ConnectionsClient by lazy { Nearby.getConnectionsClient(context) }
     private var localEndpointName: String = Build.MODEL
+    private var serviceId: String = ""
 
     private val discoveredEndpoints = mutableMapOf<String, String>()
     private val connectedEndpoints = mutableMapOf<String, String>()
@@ -41,7 +43,6 @@ class NearbyConnectionsManager private constructor(private val context: Context)
     private val connectionLifecycleCallback = object : ConnectionLifecycleCallback() {
         override fun onConnectionInitiated(endpointId: String, connectionInfo: ConnectionInfo) {
             Log.d(TAG, "onConnectionInitiated: accepting connection from ${connectionInfo.endpointName} (id: $endpointId)")
-            // Safe replacement for putIfAbsent
             if (!discoveredEndpoints.containsKey(endpointId)) {
                 discoveredEndpoints[endpointId] = connectionInfo.endpointName
             }
@@ -62,9 +63,9 @@ class NearbyConnectionsManager private constructor(private val context: Context)
                 else -> {
                     Log.e(TAG, "onConnectionResult: failure for $endpointName (id: $endpointId), status code: ${result.status.statusCode}")
                     discoveredEndpoints.remove(endpointId)
-                    if (connectedEndpoints.isEmpty()) {
-                        startAdvertising()
-                        startDiscovery()
+                    if (connectedEndpoints.isEmpty() && serviceId.isNotBlank()) {
+                        startAdvertising(serviceId)
+                        startDiscovery(serviceId)
                     }
                 }
             }
@@ -74,17 +75,18 @@ class NearbyConnectionsManager private constructor(private val context: Context)
             val removedDevice = connectedEndpoints.remove(endpointId)
             Log.d(TAG, "onDisconnected: from ${removedDevice ?: endpointId}")
             updateConnectedDevices()
-            if (connectedEndpoints.isEmpty()) {
-                startAdvertising()
-                startDiscovery()
+            // Only restart advertising/discovery if we are fully disconnected AND we have a valid serviceId (i.e., we are not in a logged-out state)
+            if (connectedEndpoints.isEmpty() && serviceId.isNotBlank()) {
+                startAdvertising(serviceId)
+                startDiscovery(serviceId)
             }
         }
     }
 
     private val endpointDiscoveryCallback = object : EndpointDiscoveryCallback() {
         override fun onEndpointFound(endpointId: String, discoveredEndpointInfo: DiscoveredEndpointInfo) {
-            if (connectedEndpoints.containsKey(endpointId)) {
-                Log.d(TAG, "onEndpointFound: already connected to ${discoveredEndpointInfo.endpointName}, ignoring.")
+            if (connectedEndpoints.isNotEmpty()) {
+                Log.d(TAG, "Already connected, ignoring new endpoint ${discoveredEndpointInfo.endpointName}")
                 return
             }
 
@@ -94,7 +96,7 @@ class NearbyConnectionsManager private constructor(private val context: Context)
                 .addOnFailureListener { e ->
                     Log.w(TAG, "requestConnection failed for endpoint $endpointId", e)
                     if (connectedEndpoints.isEmpty()) {
-                        startDiscovery()
+                        startDiscovery(serviceId)
                     }
                 }
         }
@@ -123,7 +125,8 @@ class NearbyConnectionsManager private constructor(private val context: Context)
         }
     }
 
-    fun startAdvertising() {
+    fun startAdvertising(serviceId: String) {
+        this.serviceId = serviceId
         localEndpointName = getBluetoothName()
         connectionsClient.stopAdvertising() // Defensive stop
         val advertisingOptions = AdvertisingOptions.Builder()
@@ -131,19 +134,20 @@ class NearbyConnectionsManager private constructor(private val context: Context)
             .setLowPower(true)
             .build()
         connectionsClient.startAdvertising(
-            localEndpointName, SERVICE_ID, connectionLifecycleCallback, advertisingOptions
+            localEndpointName, serviceId, connectionLifecycleCallback, advertisingOptions
         ).addOnSuccessListener { Log.d(TAG, "startAdvertising: success with name $localEndpointName") }
             .addOnFailureListener { e -> Log.e(TAG, "startAdvertising: failure", e) }
     }
 
-    fun startDiscovery() {
+    fun startDiscovery(serviceId: String) {
+        this.serviceId = serviceId
         connectionsClient.stopDiscovery() // Defensive stop
         val discoveryOptions = DiscoveryOptions.Builder()
             .setStrategy(Strategy.P2P_CLUSTER)
             .setLowPower(true)
             .build()
         connectionsClient.startDiscovery(
-            SERVICE_ID, endpointDiscoveryCallback, discoveryOptions
+            serviceId, endpointDiscoveryCallback, discoveryOptions
         ).addOnSuccessListener { Log.d(TAG, "startDiscovery: success") }
             .addOnFailureListener { e -> Log.e(TAG, "startDiscovery: failure", e) }
     }
@@ -155,13 +159,23 @@ class NearbyConnectionsManager private constructor(private val context: Context)
         connectionsClient.sendPayload(connectedEndpoints.keys.toList(), payload)
     }
 
+    fun stopAll() {
+        Log.d(TAG, "Stopping all endpoints, advertising, and discovery.")
+        serviceId = "" // Invalidate the service ID to prevent automatic restarts
+        connectionsClient.stopAllEndpoints()
+        connectionsClient.stopAdvertising()
+        connectionsClient.stopDiscovery()
+        connectedEndpoints.clear()
+        discoveredEndpoints.clear()
+        updateConnectedDevices()
+    }
+
     interface PayloadListener {
         fun onPayloadReceived(endpointId: String, payload: Payload)
     }
 
     companion object {
         private const val TAG = "NearbyConnectionsMgr"
-        private const val SERVICE_ID = "com.itachitech.notifier.SERVICE_ID"
 
         @SuppressLint("StaticFieldLeak")
         @Volatile

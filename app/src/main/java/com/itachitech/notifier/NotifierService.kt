@@ -71,13 +71,20 @@ class NotifierService : Service(), NearbyConnectionsManager.PayloadListener {
             return START_STICKY
         }
 
+        val serviceId = CredentialsManager.getHashedServiceId(this)
+        if (serviceId == null) {
+            Log.e(TAG, "Service cannot start without credentials.")
+            stopSelf()
+            return START_NOT_STICKY
+        }
+
         startForeground(NotificationHelper.SERVICE_NOTIFICATION_ID, notificationHelper.getServiceNotification("Searching for devices...", R.drawable.baseline_sync_disabled_24))
 
         observeConnectionStatus()
 
-        Log.d(TAG, "Service starting discovery and advertising")
-        nearbyConnectionsManager.startAdvertising()
-        nearbyConnectionsManager.startDiscovery()
+        Log.d(TAG, "Service starting discovery and advertising with serviceId: $serviceId")
+        nearbyConnectionsManager.startAdvertising(serviceId)
+        nearbyConnectionsManager.startDiscovery(serviceId)
 
         return START_STICKY
     }
@@ -105,6 +112,7 @@ class NotifierService : Service(), NearbyConnectionsManager.PayloadListener {
         super.onDestroy()
         serviceJob.cancel()
         wakeLock?.release()
+        nearbyConnectionsManager.stopAll()
     }
 
     override fun onBind(intent: Intent?): IBinder = binder

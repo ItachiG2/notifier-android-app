@@ -129,7 +129,7 @@ object SettingsHelper {
                 val intent = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
                 intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 context.startActivity(intent)
-            } catch (e: Exception) {
+            } catch (e: ActivityNotFoundException) {
                 Log.e(TAG, "Failed to open battery optimization fallback", e)
                 openStandardAppSettings(context)
             }
